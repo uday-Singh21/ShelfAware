@@ -1,16 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
-import { 
-  TextInput, 
-  Button, 
-  Surface, 
+import React, {useState, useEffect} from 'react';
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+  Modal,
+} from 'react-native';
+import {
+  TextInput,
+  Button,
+  Surface,
   Text,
   Menu,
+  Portal,
+  Dialog,
 } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import TextRecognition from 'react-native-text-recognition';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { colors } from '../../constants/colors';
+import DatePicker from 'react-native-date-picker';
+import {colors} from '../../constants/colors';
 import moment from 'moment';
 
 const CATEGORIES = [
@@ -21,11 +29,11 @@ const CATEGORIES = [
   'Beverages',
   'Snacks',
   'Canned Goods',
-  'Other'
+  'Other',
 ];
 
-const ProductInputScreen = ({ route, navigation }) => {
-  const { photoPath } = route.params;
+const ProductInputScreen = ({route, navigation}) => {
+  const {photoPath} = route.params;
   const [loading, setLoading] = useState(true);
   const [productName, setProductName] = useState('');
   const [category, setCategory] = useState('');
@@ -33,6 +41,8 @@ const ProductInputScreen = ({ route, navigation }) => {
   const [expiryDate, setExpiryDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
+  // const [showExpiredDialog, setShowExpiredDialog] = useState(false);
+  const [showNoExpiryDialog, setShowNoExpiryDialog] = useState(false);
 
   useEffect(() => {
     scanImage();
@@ -45,34 +55,37 @@ const ProductInputScreen = ({ route, navigation }) => {
       const extractedDate = extractExpiryDate(text);
       if (extractedDate) {
         setExpiryDate(extractedDate);
+      } else {
+        setShowNoExpiryDialog(true);
       }
     } catch (error) {
       console.error('Failed to scan image:', error);
+      setShowNoExpiryDialog(true);
     } finally {
       setLoading(false);
     }
   };
 
-  const extractExpiryDate = (text) => {
+  const extractExpiryDate = text => {
     // Common date formats and phrases
     const datePatterns = [
       // DD/MM/YYYY or DD-MM-YYYY
       /(?:exp(?:iry)?|best before|use by|valid until|bb|exp\.?|use before)(?:\s*date)?[\s:\.]+(\d{1,2}[\/-]\d{1,2}[\/-]\d{4})/gi,
-      
+
       // MM/YYYY or MM-YYYY
       /(?:exp(?:iry)?|best before|use by|valid until|bb|exp\.?|use before)(?:\s*date)?[\s:\.]+(\d{1,2}[\/-]\d{4})/gi,
-      
+
       // YYYY/MM/DD or YYYY-MM-DD
       /(?:exp(?:iry)?|best before|use by|valid until|bb|exp\.?|use before)(?:\s*date)?[\s:\.]+(\d{4}[\/-]\d{1,2}[\/-]\d{1,2})/gi,
-      
+
       // Dates without keywords
       /(\d{1,2}[\/-]\d{1,2}[\/-]\d{4})/g,
       /(\d{4}[\/-]\d{1,2}[\/-]\d{1,2})/g,
       /(\d{1,2}[\/-]\d{4})/g,
-      
+
       // Text month formats
       /(?:exp(?:iry)?|best before|use by|valid until|bb|exp\.?|use before)(?:\s*date)?[\s:\.]+(\d{1,2}\s*(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s*\d{4})/gi,
-      
+
       // End of month formats
       /(?:exp(?:iry)?|best before|use by|valid until|bb|exp\.?|use before)(?:\s*date)?[\s:\.]+(?:end of)\s*(\d{1,2}[\/-]\d{4})/gi,
     ];
@@ -85,18 +98,35 @@ const ProductInputScreen = ({ route, navigation }) => {
         if (match && match[1]) {
           const dateStr = match[1].toLowerCase();
           let date = null;
-          
-          // Handle MM/YYYY format
+
+          // Handle MM/YYYY format - now using last day of month
           if (dateStr.match(/^\d{1,2}[\/-]\d{4}$/)) {
             const [month, year] = dateStr.split(/[\/-]/);
-            date = new Date(year, month - 1, 1); // First day of the month
+            // Get last day of the month
+            date = new Date(year, month, 0); // Setting day to 0 gets last day of previous month
           }
           // Handle text month format
-          else if (dateStr.match(/\d{1,2}\s*(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s*\d{4}/i)) {
-            const parts = dateStr.match(/(\d{1,2})\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s*(\d{4})/i);
+          else if (
+            dateStr.match(
+              /\d{1,2}\s*(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s*\d{4}/i,
+            )
+          ) {
+            const parts = dateStr.match(
+              /(\d{1,2})\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s*(\d{4})/i,
+            );
             const months = {
-              jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
-              jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
+              jan: 0,
+              feb: 1,
+              mar: 2,
+              apr: 3,
+              may: 4,
+              jun: 5,
+              jul: 6,
+              aug: 7,
+              sep: 8,
+              oct: 9,
+              nov: 10,
+              dec: 11,
             };
             date = new Date(parts[3], months[parts[2].toLowerCase()], parts[1]);
           }
@@ -105,8 +135,11 @@ const ProductInputScreen = ({ route, navigation }) => {
             date = new Date(dateStr.replace(/[\/-]/g, '/'));
           }
 
-          // Only add valid dates that are not in the past
-          if (date && !isNaN(date.getTime()) && date > new Date()) {
+          // Check if date is valid but in the past
+          if (date && !isNaN(date.getTime())) {
+            if (date < new Date()) {
+              setShowExpiredDialog(true);
+            }
             foundDates.push(date);
           }
         }
@@ -124,6 +157,17 @@ const ProductInputScreen = ({ route, navigation }) => {
 
     // If only one date found, return that
     return foundDates[0];
+  };
+
+  const formatDateForDisplay = date => {
+    // If it's the last day of a month, show only month and year
+    if (
+      date.getDate() ===
+      new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
+    ) {
+      return moment(date).format('MM/YYYY');
+    }
+    return moment(date).format('DD/MM/YYYY');
   };
 
   const handleSave = () => {
@@ -151,13 +195,11 @@ const ProductInputScreen = ({ route, navigation }) => {
                 <Button
                   mode="outlined"
                   onPress={() => setMenuVisible(true)}
-                  style={styles.input}
-                >
+                  style={styles.input}>
                   {category || 'Select Category'}
                 </Button>
-              }
-            >
-              {CATEGORIES.map((cat) => (
+              }>
+              {CATEGORIES.map(cat => (
                 <Menu.Item
                   key={cat}
                   onPress={() => {
@@ -188,35 +230,65 @@ const ProductInputScreen = ({ route, navigation }) => {
             <Button
               mode="outlined"
               onPress={() => setShowDatePicker(true)}
-              style={styles.input}
-            >
-              Expiry Date: {expiryDate.toLocaleDateString()}
+              style={styles.input}>
+              Expiry Date: {formatDateForDisplay(expiryDate)}
             </Button>
 
-            {showDatePicker && (
-              <DateTimePicker
-                value={expiryDate}
-                mode="date"
-                display="default"
-                onChange={(event, selectedDate) => {
-                  setShowDatePicker(false);
-                  if (selectedDate) {
-                    setExpiryDate(selectedDate);
-                  }
-                }}
-              />
-            )}
+            <DatePicker
+              modal
+              open={showDatePicker}
+              date={expiryDate}
+              mode="date"
+              minimumDate={new Date()}
+              onConfirm={date => {
+                setShowDatePicker(false);
+                setExpiryDate(date);
+              }}
+              onCancel={() => {
+                setShowDatePicker(false);
+              }}
+            />
 
             <Button
               mode="contained"
               onPress={handleSave}
-              style={styles.saveButton}
-            >
+              style={styles.saveButton}>
               Save Product
             </Button>
           </Surface>
         </ScrollView>
       )}
+
+      <Portal>
+        <Dialog
+          visible={showNoExpiryDialog}
+          onDismiss={() => setShowNoExpiryDialog(false)}
+          style={styles.dialog}>
+          <Dialog.Title>No Expiry Date Found</Dialog.Title>
+          <Dialog.Content>
+            <Text>
+              We couldn't find an expiry date in the scanned image. Would you
+              like to try scanning again or enter the date manually?
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button
+              onPress={() => {
+                setShowNoExpiryDialog(false);
+                navigation.goBack();
+              }}>
+              Scan Again
+            </Button>
+            <Button
+              onPress={() => {
+                setShowNoExpiryDialog(false);
+                setShowDatePicker(true);
+              }}>
+              Enter Manually
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </SafeAreaView>
   );
 };
@@ -249,7 +321,11 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     color: colors.disabled,
-  }
+  },
+  dialog: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+  },
 });
 
-export default ProductInputScreen; 
+export default ProductInputScreen;
