@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../constants/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import auth from '@react-native-firebase/auth';
 
 const LANGUAGES = [
   { label: 'English', value: 'en' },
@@ -34,6 +35,23 @@ const SettingsScreen = () => {
   const [theme, setTheme] = useState('system');
   const [showLanguageDialog, setShowLanguageDialog] = useState(false);
   const [showThemeDialog, setShowThemeDialog] = useState(false);
+  const [showSignOutDialog, setShowSignOutDialog] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleSignOut = async () => {
+    try {
+      setLoading(true);
+      await auth().signOut();
+    } catch (error) {
+      console.error('Error signing out:', error);
+    } finally {
+      setLoading(false);
+      setShowSignOutDialog(false);
+    }
+  };
+
+  const currentUser = auth()?.currentUser;
+  const userEmail = currentUser ? currentUser.email : 'user@example.com';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -82,7 +100,7 @@ const SettingsScreen = () => {
           <List.Subheader>Account</List.Subheader>
           <List.Item
             title="Email"
-            description="user@example.com"
+            description={userEmail}
             left={props => <Icon {...props} name="email-outline" size={24} />}
           />
           <List.Item
@@ -94,6 +112,7 @@ const SettingsScreen = () => {
             title="Sign Out"
             left={props => <Icon {...props} name="logout-variant" size={24} color={colors.error} />}
             titleStyle={{ color: colors.error }}
+            onPress={() => setShowSignOutDialog(true)}
           />
         </List.Section>
 
@@ -154,6 +173,34 @@ const SettingsScreen = () => {
           </Dialog.Content>
           <Dialog.Actions>
             <Button onPress={() => setShowThemeDialog(false)}>Done</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+
+      {/* Add Sign Out Dialog */}
+      <Portal>
+        <Dialog visible={showSignOutDialog} onDismiss={() => !loading && setShowSignOutDialog(false)}>
+          <Dialog.Title>Sign Out</Dialog.Title>
+          <Dialog.Content>
+            <Dialog.Paragraph>
+              Are you sure you want to sign out?
+            </Dialog.Paragraph>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button 
+              onPress={() => setShowSignOutDialog(false)}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onPress={handleSignOut} 
+              loading={loading}
+              disabled={loading}
+              textColor={colors.error}
+            >
+              Sign Out
+            </Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>

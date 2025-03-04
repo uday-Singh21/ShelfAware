@@ -1,20 +1,29 @@
 {
   "project_info": {
-    "project_id": "shelf-aware"
+    "project_number": "184943515200",
+    "project_id": "shelfaware-c6cf6",
+    "storage_bucket": "shelfaware-c6cf6.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:123456789012:android:1234567890",
+        "mobilesdk_app_id": "1:184943515200:android:f103554dced224ec7371a5",
         "android_client_info": {
           "package_name": "com.shelfaware"
         }
       },
+      "oauth_client": [],
       "api_key": [
         {
-          "current_key": "your-api-key"
+          "current_key": "AIzaSyDgczFWqQm6eN7hS-rp1HT9TMcmEMit2TM"
         }
-      ]
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
     }
-  ]
-} 
+  ],
+  "configuration_version": "1"
+}
