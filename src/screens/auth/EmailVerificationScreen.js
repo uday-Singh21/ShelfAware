@@ -6,6 +6,7 @@ import { colors } from '../../constants/colors';
 import { resendVerificationEmail } from '../../services/auth';
 import ErrorMessage from '../../components/common/ErrorMessage';
 import auth from '@react-native-firebase/auth';
+import { fonts } from '../../constants/fonts';
 
 const EmailVerificationScreen = ({ route, navigation }) => {
   const { email } = route.params;
@@ -146,16 +147,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
     color: colors.primary,
+    fontFamily: fonts.bold,
   },
   description: {
     textAlign: 'center',
     marginBottom: 16,
     color: colors.disabled,
+    fontFamily: fonts.regular,
   },
   email: {
     textAlign: 'center',
     marginBottom: 16,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     color: colors.primary,
   },
   button: {
@@ -169,6 +172,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 16,
     color: colors.success,
+    fontFamily: fonts.medium,
   },
   steps: {
     marginVertical: 16,
@@ -176,7 +180,7 @@ const styles = StyleSheet.create({
   },
   stepsTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     color: colors.text,
     marginBottom: 8,
   },
@@ -184,12 +188,14 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: 8,
     paddingLeft: 8,
+    fontFamily: fonts.regular,
   },
   smallText: {
     textAlign: 'center',
     color: colors.disabled,
     marginTop: 24,
     marginBottom: 8,
+    fontFamily: fonts.regular,
   },
 });
 

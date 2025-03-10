@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { ActivityIndicator, Text } from 'react-native-paper';
 import { colors } from '../constants/colors';
+import { fonts } from '../constants/fonts';
 
 const LoadingScreen = () => {
   return (
@@ -22,6 +23,8 @@ const styles = StyleSheet.create({
   text: {
     marginTop: 16,
     color: colors.primary,
+    fontFamily: fonts.medium,
+    fontSize: 16,
   },
 });
 

@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Keyboard } from 'react-native';
-import { TextInput, Button, Text, Surface, IconButton } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors } from '../../constants/colors';
-import { signIn } from '../../services/auth';
+import React, {useState} from 'react';
+import {StyleSheet, View, Keyboard, Image} from 'react-native';
+import {TextInput, Button, Text, Surface, IconButton} from 'react-native-paper';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {colors} from '../../constants/colors';
+import {signIn} from '../../services/auth';
 import ErrorMessage from '../../components/common/ErrorMessage';
+import {fonts} from '../../constants/fonts';
 
-const SignInScreen = ({ navigation }) => {
+const SignInScreen = ({navigation}) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -41,116 +42,181 @@ const SignInScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Surface style={styles.form}>
-        <Text variant="headlineMedium" style={styles.title}>Welcome Back</Text>
-        
-        <TextInput
-          label="Email"
-          value={email}
-          onChangeText={(text) => {
-            setEmail(text);
-            setError('');
-          }}
-          autoCapitalize="none"
-          keyboardType="email-address"
-          style={styles.input}
-          error={error && !email.trim()}
-        />
+    <View style={[styles.container, {backgroundColor: colors.primary}]}>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.header}>
+          <Text variant="displaySmall" style={styles.title}>
+            Welcome Back
+          </Text>
+          <Text variant="bodyLarge" style={styles.subtitle}>
+            Sign in to continue managing your inventory
+          </Text>
+        </View>
 
-        <TextInput
-          label="Password"
-          value={password}
-          onChangeText={(text) => {
-            setPassword(text);
-            setError('');
-          }}
-          secureTextEntry={!showPassword}
-          style={styles.input}
-          error={error && !password}
-          right={
-            <TextInput.Icon
-              icon={showPassword ? "eye-off" : "eye"}
-              onPress={() => setShowPassword(!showPassword)}
-            />
-          }
-        />
+        <Surface style={styles.form} elevation={4}>
+          <TextInput
+            label="Email"
+            value={email}
+            onChangeText={text => {
+              setEmail(text);
+              setError('');
+            }}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            style={styles.input}
+            error={error && !email.trim()}
+            left={<TextInput.Icon icon="email" />}
+            mode="outlined"
+            outlineColor={colors.border}
+            activeOutlineColor={colors.primary}
+          />
 
-        <ErrorMessage message={error} />
+          <TextInput
+            label="Password"
+            value={password}
+            onChangeText={text => {
+              setPassword(text);
+              setError('');
+            }}
+            secureTextEntry={!showPassword}
+            style={styles.input}
+            error={error && !password}
+            left={<TextInput.Icon icon="lock" />}
+            right={
+              <TextInput.Icon
+                icon={showPassword ? 'eye-off' : 'eye'}
+                onPress={() => setShowPassword(!showPassword)}
+              />
+            }
+            mode="outlined"
+            outlineColor={colors.border}
+            activeOutlineColor={colors.primary}
+          />
 
-        <Button
-          mode="contained"
-          onPress={handleSignIn}
-          loading={loading}
-          disabled={loading || !email.trim() || !password}
-          style={styles.button}
-        >
-          Sign In
-        </Button>
+          <ErrorMessage message={error} />
 
-        <Button
-          mode="text"
-          onPress={() => {
-            setError('');
-            navigation.navigate('ForgotPassword');
-          }}
-          style={styles.textButton}
-        >
-          Forgot Password?
-        </Button>
+          <Button
+            mode="contained"
+            onPress={handleSignIn}
+            loading={loading}
+            // disabled={loading || !email.trim() || !password}
+            style={styles.button}
+            contentStyle={styles.buttonContent}
+            labelStyle={styles.buttonLabel}>
+            Sign In
+          </Button>
 
-        <View style={styles.footer}>
-          <Text>Don't have an account? </Text>
           <Button
             mode="text"
             onPress={() => {
               setError('');
-              navigation.navigate('SignUp');
+              navigation.navigate('ForgotPassword');
             }}
             style={styles.textButton}
-          >
-            Sign Up
+            textColor={colors.text}>
+            Forgot Password?
           </Button>
-        </View>
-      </Surface>
-    </SafeAreaView>
+
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>OR</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Don't have an account?</Text>
+            <Button
+              mode="text"
+              onPress={() => {
+                setError('');
+                navigation.navigate('SignUp');
+              }}
+              textColor={colors.primary}
+              style={styles.signUpButton}>
+              Sign Up
+            </Button>
+          </View>
+        </Surface>
+      </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+  },
+  safeArea: {
+    flex: 1,
     justifyContent: 'center',
   },
-  form: {
-    margin: 16,
-    padding: 16,
-    borderRadius: 8,
-    elevation: 4,
+  header: {
+    alignItems: 'center',
+    paddingVertical: 40,
   },
   title: {
-    textAlign: 'center',
-    marginBottom: 24,
-    color: colors.primary,
+    color: '#fff',
+    fontFamily: fonts.bold,
+    marginBottom: 8,
+  },
+  subtitle: {
+    color: '#fff',
+    opacity: 0.8,
+    fontFamily: fonts.regular,
+  },
+  form: {
+    margin: 20,
+    padding: 20,
+    borderRadius: 15,
+    backgroundColor: colors.surface,
   },
   input: {
     marginBottom: 16,
-    backgroundColor: 'transparent',
+    backgroundColor: colors.surface,
   },
   button: {
     marginTop: 8,
-    paddingVertical: 6,
+    borderRadius: 8,
+    elevation: 2,
+  },
+  buttonContent: {
+    height: 48,
+  },
+  buttonLabel: {
+    fontSize: 16,
+    fontFamily: fonts.semiBold,
   },
   textButton: {
     marginTop: 8,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  dividerText: {
+    marginHorizontal: 10,
+    color: colors.text,
+    opacity: 0.6,
+    fontFamily: fonts.regular,
   },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 16,
+  },
+  footerText: {
+    color: colors.text,
+    fontFamily: fonts.regular,
+  },
+  signUpButton: {
+    marginLeft: 4,
   },
 });
 
-export default SignInScreen; 
+export default SignInScreen;

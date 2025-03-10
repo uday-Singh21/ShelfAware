@@ -1,19 +1,14 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
-import { 
-  Appbar, 
-  List, 
-  Switch, 
-  Divider,
-  Portal,
-  Dialog,
-  Button,
-  RadioButton
-} from 'react-native-paper';
+import { StyleSheet, View, ScrollView } from 'react-native';
+import { Appbar, List, Switch, Divider, Button, Dialog, RadioButton, Portal } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors } from '../../constants/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { colors } from '../../constants/colors';
+import { fonts } from '../../constants/fonts';
+import { signOut } from '../../services/auth';
 import auth from '@react-native-firebase/auth';
+import { useNavigation } from '@react-navigation/native';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 
 const LANGUAGES = [
   { label: 'English', value: 'en' },
@@ -28,25 +23,20 @@ const THEMES = [
 ];
 
 const SettingsScreen = () => {
-  // Comment out state for now
+  const navigation = useNavigation();
+  const tabBarHeight = useBottomTabBarHeight();
   const [pushEnabled, setPushEnabled] = useState(true);
   const [expiryThreshold, setExpiryThreshold] = useState(3);
   const [language, setLanguage] = useState('en');
   const [theme, setTheme] = useState('system');
   const [showLanguageDialog, setShowLanguageDialog] = useState(false);
   const [showThemeDialog, setShowThemeDialog] = useState(false);
-  const [showSignOutDialog, setShowSignOutDialog] = useState(false);
-  const [loading, setLoading] = useState(false);
 
   const handleSignOut = async () => {
     try {
-      setLoading(true);
-      await auth().signOut();
+      await signOut();
     } catch (error) {
       console.error('Error signing out:', error);
-    } finally {
-      setLoading(false);
-      setShowSignOutDialog(false);
     }
   };
 
@@ -55,33 +45,29 @@ const SettingsScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Appbar.Header>
+      <Appbar.Header style={styles.header}>
         <Appbar.Content title="Settings" />
       </Appbar.Header>
 
-      <ScrollView>
+      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: tabBarHeight }}>
         <List.Section>
-          <List.Subheader>Notifications</List.Subheader>
+          <List.Subheader style={styles.sectionTitle}>Notifications</List.Subheader>
           <List.Item
             title="Push Notifications"
             right={() => (
               <Switch
-                // value={pushEnabled}
-                // onValueChange={setPushEnabled}
+                value={pushEnabled}
+                onValueChange={setPushEnabled}
               />
             )}
           />
-          <List.Item
-            title="Expiry Alert Threshold"
-            description={`Alert me {expiryThreshold} days before expiry`}
-            onPress={() => {/* TODO: Add threshold picker */}}
-          />
+        
         </List.Section>
 
         <Divider />
 
-        <List.Section>
-          <List.Subheader>Appearance</List.Subheader>
+        {/* <List.Section>
+          <List.Subheader style={styles.sectionTitle}>Appearance</List.Subheader>
           <List.Item
             title="Language"
             // description={LANGUAGES.find(l => l.value === language)?.label}
@@ -92,12 +78,12 @@ const SettingsScreen = () => {
             // description={THEMES.find(t => t.value === theme)?.label}
             onPress={() => setShowThemeDialog(true)}
           />
-        </List.Section>
+        </List.Section> */}
 
         <Divider />
 
         <List.Section>
-          <List.Subheader>Account</List.Subheader>
+          <List.Subheader style={styles.sectionTitle}>Account</List.Subheader>
           <List.Item
             title="Email"
             description={userEmail}
@@ -111,13 +97,13 @@ const SettingsScreen = () => {
           <List.Item
             title="Sign Out"
             left={props => <Icon {...props} name="logout-variant" size={24} color={colors.error} />}
-            titleStyle={{ color: colors.error }}
-            onPress={() => setShowSignOutDialog(true)}
+            titleStyle={styles.signOutText}
+            onPress={handleSignOut}
           />
         </List.Section>
 
         <List.Section>
-          <List.Subheader>About</List.Subheader>
+          <List.Subheader style={styles.sectionTitle}>About</List.Subheader>
           <List.Item
             title="Version"
             description="1.0.0"
@@ -176,34 +162,6 @@ const SettingsScreen = () => {
           </Dialog.Actions>
         </Dialog>
       </Portal>
-
-      {/* Add Sign Out Dialog */}
-      <Portal>
-        <Dialog visible={showSignOutDialog} onDismiss={() => !loading && setShowSignOutDialog(false)}>
-          <Dialog.Title>Sign Out</Dialog.Title>
-          <Dialog.Content>
-            <Dialog.Paragraph>
-              Are you sure you want to sign out?
-            </Dialog.Paragraph>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button 
-              onPress={() => setShowSignOutDialog(false)}
-              disabled={loading}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onPress={handleSignOut} 
-              loading={loading}
-              disabled={loading}
-              textColor={colors.error}
-            >
-              Sign Out
-            </Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
     </SafeAreaView>
   );
 };
@@ -211,7 +169,33 @@ const SettingsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.background,
+  },
+  header: {
+    backgroundColor: colors.background,
+  },
+  content: {
+    flex: 1,
+  },
+  section: {
     backgroundColor: colors.surface,
+    marginBottom: 8,
+  },
+  sectionTitle: {
+    fontFamily: fonts.medium,
+    fontSize: 16,
+    color: colors.text,
+  },
+  listItem: {
+    fontFamily: fonts.regular,
+  },
+  listItemDescription: {
+    fontFamily: fonts.regular,
+    color: colors.disabled,
+  },
+  signOutText: {
+    fontFamily: fonts.medium,
+    color: colors.error,
   },
 });
 

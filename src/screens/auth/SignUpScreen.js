@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Keyboard } from 'react-native';
-import { TextInput, Button, Text, Surface } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors } from '../../constants/colors';
-import { signUp } from '../../services/auth';
+import React, {useState} from 'react';
+import {StyleSheet, View, Keyboard} from 'react-native';
+import {TextInput, Button, Text, Surface} from 'react-native-paper';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {colors} from '../../constants/colors';
+import {signUp} from '../../services/auth';
 import ErrorMessage from '../../components/common/ErrorMessage';
+import {fonts} from '../../constants/fonts';
 
-const SignUpScreen = ({ navigation }) => {
+const SignUpScreen = ({navigation}) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -21,7 +22,7 @@ const SignUpScreen = ({ navigation }) => {
       return false;
     }
     if (!password) {
-      setError('Please enter a password');
+      setError('Please enter your password');
       return false;
     }
     if (password.length < 6) {
@@ -43,7 +44,9 @@ const SignUpScreen = ({ navigation }) => {
       setLoading(true);
       setError('');
       await signUp(email.trim().toLowerCase(), password);
-      navigation.navigate('EmailVerification', { email: email.trim().toLowerCase() });
+      navigation.navigate('EmailVerification', {
+        email: email.trim().toLowerCase(),
+      });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -52,118 +55,189 @@ const SignUpScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Surface style={styles.form}>
-        <Text variant="headlineMedium" style={styles.title}>Create Account</Text>
-
-        <TextInput
-          label="Email"
-          value={email}
-          onChangeText={(text) => {
-            setEmail(text);
-            setError('');
-          }}
-          autoCapitalize="none"
-          keyboardType="email-address"
-          style={styles.input}
-          error={error && !email.trim()}
-        />
-
-        <TextInput
-          label="Password"
-          value={password}
-          onChangeText={(text) => {
-            setPassword(text);
-            setError('');
-          }}
-          secureTextEntry={!showPassword}
-          style={styles.input}
-          error={error && (!password || password.length < 6)}
-          right={
-            <TextInput.Icon
-              icon={showPassword ? "eye-off" : "eye"}
-              onPress={() => setShowPassword(!showPassword)}
-            />
-          }
-        />
-
-        <TextInput
-          label="Confirm Password"
-          value={confirmPassword}
-          onChangeText={(text) => {
-            setConfirmPassword(text);
-            setError('');
-          }}
-          secureTextEntry={!showConfirmPassword}
-          style={styles.input}
-          error={error && password !== confirmPassword}
-          right={
-            <TextInput.Icon
-              icon={showConfirmPassword ? "eye-off" : "eye"}
-              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-            />
-          }
-        />
-
-        <ErrorMessage message={error} />
-
-        <Button
-          mode="contained"
-          onPress={handleSignUp}
-          loading={loading}
-          disabled={loading || !email.trim() || !password || !confirmPassword}
-          style={styles.button}
-        >
-          Sign Up
-        </Button>
-
-        <View style={styles.footer}>
-          <Text>Already have an account? </Text>
-          <Button
-            mode="text"
-            onPress={() => {
-              setError('');
-              navigation.navigate('SignIn');
-            }}
-            style={styles.textButton}
-          >
-            Sign In
-          </Button>
+    <View style={[styles.container, {backgroundColor: colors.primary}]}>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.header}>
+          <Text variant="displaySmall" style={styles.title}>
+            Create Account
+          </Text>
+          <Text variant="bodyLarge" style={styles.subtitle}>
+            Join ShelfAware to manage your inventory efficiently
+          </Text>
         </View>
-      </Surface>
-    </SafeAreaView>
+
+        <Surface style={styles.form} elevation={4}>
+          <TextInput
+            label="Email"
+            value={email}
+            onChangeText={text => {
+              setEmail(text);
+              setError('');
+            }}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            style={styles.input}
+            error={error && !email.trim()}
+            left={<TextInput.Icon icon="email" />}
+            mode="outlined"
+            outlineColor={colors.border}
+            activeOutlineColor={colors.primary}
+          />
+
+          <TextInput
+            label="Password"
+            value={password}
+            onChangeText={text => {
+              setPassword(text);
+              setError('');
+            }}
+            secureTextEntry={!showPassword}
+            style={styles.input}
+            error={error && !password}
+            left={<TextInput.Icon icon="lock" />}
+            right={
+              <TextInput.Icon
+                icon={showPassword ? 'eye-off' : 'eye'}
+                onPress={() => setShowPassword(!showPassword)}
+              />
+            }
+            mode="outlined"
+            outlineColor={colors.border}
+            activeOutlineColor={colors.primary}
+          />
+
+          <TextInput
+            label="Confirm Password"
+            value={confirmPassword}
+            onChangeText={text => {
+              setConfirmPassword(text);
+              setError('');
+            }}
+            secureTextEntry={!showConfirmPassword}
+            style={styles.input}
+            error={error && !confirmPassword}
+            left={<TextInput.Icon icon="lock-check" />}
+            right={
+              <TextInput.Icon
+                icon={showConfirmPassword ? 'eye-off' : 'eye'}
+                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+              />
+            }
+            mode="outlined"
+            outlineColor={colors.border}
+            activeOutlineColor={colors.primary}
+          />
+
+          <ErrorMessage message={error} />
+
+          <Button
+            mode="contained"
+            onPress={handleSignUp}
+            loading={loading}
+            // disabled={loading || !email.trim() || !password || !confirmPassword}
+            style={styles.button}
+            contentStyle={styles.buttonContent}
+            labelStyle={styles.buttonLabel}>
+            Sign Up
+          </Button>
+
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>OR</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Already have an account?</Text>
+            <Button
+              mode="text"
+              onPress={() => {
+                setError('');
+                navigation.navigate('SignIn');
+              }}
+              textColor={colors.primary}
+              style={styles.signInButton}>
+              Sign In
+            </Button>
+          </View>
+        </Surface>
+      </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
   },
-  form: {
-    margin: 16,
-    padding: 16,
-    borderRadius: 8,
+  safeArea: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  header: {
+    alignItems: 'center',
+    paddingVertical: 40,
   },
   title: {
-    textAlign: 'center',
-    marginBottom: 24,
+    color: colors.surface,
+    fontFamily: fonts.bold,
+    marginBottom: 8,
+  },
+  subtitle: {
+    color: colors.surface,
+    opacity: 0.8,
+    fontFamily: fonts.regular,
+  },
+  form: {
+    margin: 20,
+    padding: 20,
+    borderRadius: 15,
+    backgroundColor: colors.surface,
   },
   input: {
     marginBottom: 16,
+    backgroundColor: colors.surface,
   },
   button: {
     marginTop: 8,
+    borderRadius: 8,
+    elevation: 2,
   },
-  textButton: {
-    marginTop: 8,
+  buttonContent: {
+    height: 48,
+  },
+  buttonLabel: {
+    fontSize: 16,
+    fontFamily: fonts.semiBold,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  dividerText: {
+    marginHorizontal: 10,
+    color: colors.text,
+    opacity: 0.6,
+    fontFamily: fonts.regular,
   },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 16,
+  },
+  footerText: {
+    color: colors.text,
+    fontFamily: fonts.regular,
+  },
+  signInButton: {
+    marginLeft: 4,
   },
 });
 
-export default SignUpScreen; 
+export default SignUpScreen;

@@ -1,10 +1,11 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import {
   View,
   StyleSheet,
   ScrollView,
   ActivityIndicator,
   Modal,
+  Alert,
 } from 'react-native';
 import {
   TextInput,
@@ -15,16 +16,19 @@ import {
   Portal,
   Dialog,
   IconButton,
+  Appbar,
 } from 'react-native-paper';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import TextRecognition from 'react-native-text-recognition';
 import DatePicker from 'react-native-date-picker';
 import {colors} from '../../constants/colors';
 import moment from 'moment';
-import { addProduct } from '../../services/firestore';
-import { validateProduct } from '../../utils/validation';
+import {addProduct} from '../../services/firestore';
+import {validateProduct} from '../../utils/validation';
 import ErrorMessage from '../../components/common/ErrorMessage';
 import firestore from '@react-native-firebase/firestore';
+import auth from '@react-native-firebase/auth';
+import {useBottomTabBarHeight} from '@react-navigation/bottom-tabs';
 
 const CATEGORIES = [
   'Dairy',
@@ -41,49 +45,78 @@ const CATEGORIES = [
 
 // Add units based on categories
 const CATEGORY_UNITS = {
-  'Dairy': ['L', 'ml', 'kg', 'g', 'pack'],
-  'Meat': ['kg', 'g', 'pack', 'pieces'],
-  'Vegetables': ['kg', 'g', 'pack', 'pieces'],
-  'Fruits': ['kg', 'g', 'pack', 'pieces'],
-  'Beverages': ['L', 'ml', 'pack', 'can', 'bottle'],
-  'Snacks': ['g', 'pack', 'pieces'],
+  Dairy: ['L', 'ml', 'kg', 'g', 'pack'],
+  Meat: ['kg', 'g', 'pack', 'pieces'],
+  Vegetables: ['kg', 'g', 'pack', 'pieces'],
+  Fruits: ['kg', 'g', 'pack', 'pieces'],
+  Beverages: ['L', 'ml', 'pack', 'can', 'bottle'],
+  Snacks: ['g', 'pack', 'pieces'],
   'Canned Goods': ['g', 'can', 'pack'],
-  'Medicine': ['tablets', 'pieces', 'bottle', 'pack'],
-  'Cosmetics': ['ml', 'g', 'pieces', 'pack'],
-  'Other': ['pieces', 'pack', 'kg', 'g', 'L', 'ml'],
+  Medicine: ['tablets', 'pieces', 'bottle', 'pack'],
+  Cosmetics: ['ml', 'g', 'pieces', 'pack'],
+  Other: ['pieces', 'pack', 'kg', 'g', 'L', 'ml'],
 };
 
+const REMINDER_OPTIONS = [
+  {label: '1 day', value: 1},
+  {label: '3 days', value: 3},
+  {label: '7 days (1 week)', value: 7},
+  {label: '14 days (2 weeks)', value: 14},
+  {label: '30 days (1 month)', value: 30},
+  {label: '90 days (3 months)', value: 90},
+  {label: 'Custom', value: 'custom'},
+];
+
 const ProductInputScreen = ({route, navigation}) => {
-  const {photoPath, userId} = route.params;
-  const [loading, setLoading] = useState(true);
-  const [productName, setProductName] = useState('');
-  const [category, setCategory] = useState('');
-  const [customCategory, setCustomCategory] = useState('');
-  const [expiryDate, setExpiryDate] = useState(new Date());
+  const {photoPath, userId, product, isEditing} = route.params;
+  const tabBarHeight = useBottomTabBarHeight();
+  const [loading, setLoading] = useState(false);
+  const [name, setName] = useState(isEditing ? product.name : '');
+  const [barcode, setBarcode] = useState(isEditing ? product.barcode : '');
+  const [category, setCategory] = useState(
+    isEditing ? (product.isCustomCategory ? 'Other' : product.category) : '',
+  );
+  const [customCategory, setCustomCategory] = useState(
+    isEditing && product.isCustomCategory ? product.customCategory : '',
+  );
+  const [expiryDate, setExpiryDate] = useState(() => {
+    if (isEditing && product.expiryDate) {
+      // Handle both Firestore Timestamp and regular Date objects
+      return product.expiryDate.toDate
+        ? new Date(product.expiryDate.toDate())
+        : new Date(product.expiryDate);
+    }
+    return new Date();
+  });
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
-  // const [showExpiredDialog, setShowExpiredDialog] = useState(false);
   const [showNoExpiryDialog, setShowNoExpiryDialog] = useState(false);
-  const [quantity, setQuantity] = useState(1);
-  const [unit, setUnit] = useState('');
+  const [quantity, setQuantity] = useState(
+    isEditing ? product.quantity.toString() : '1',
+  );
+  const [unit, setUnit] = useState(isEditing ? product.unit : '');
   const [unitMenuVisible, setUnitMenuVisible] = useState(false);
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState(isEditing ? product.notes : '');
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
 
-  useEffect(() => {
-    scanImage();
-  }, [photoPath]);
+  // Initialize reminder states based on editing mode
+  const initialReminderDays = isEditing ? product.reminderDays : 7;
+  const [reminderDays, setReminderDays] = useState(initialReminderDays);
+  const [customReminderDays, setCustomReminderDays] = useState(
+    initialReminderDays.toString(),
+  );
+  const [showReminderMenu, setShowReminderMenu] = useState(false);
+  const [isCustomReminder, setIsCustomReminder] = useState(
+    isEditing
+      ? !REMINDER_OPTIONS.some(option => option.value === product.reminderDays)
+      : false,
+  );
 
-  // Update unit when category changes
-  useEffect(() => {
-    if (category && CATEGORY_UNITS[category]) {
-      setUnit(CATEGORY_UNITS[category][0]);
-    }
-  }, [category]);
-
-  const scanImage = async () => {
+  const scanImage = useCallback(async () => {
     try {
+      setIsScanning(true);
       const result = await TextRecognition.recognize(photoPath);
       const text = result.join(' ');
       const extractedDate = extractExpiryDate(text);
@@ -96,9 +129,36 @@ const ProductInputScreen = ({route, navigation}) => {
       console.error('Failed to scan image:', error);
       setShowNoExpiryDialog(true);
     } finally {
+      setIsScanning(false);
       setLoading(false);
     }
-  };
+  }, [photoPath, setExpiryDate, setShowNoExpiryDialog]);
+
+  useEffect(() => {
+    if (photoPath && !isEditing) {
+      scanImage();
+    }
+  }, [photoPath, isEditing, scanImage]);
+
+  // Update unit when category changes
+  useEffect(() => {
+    if (category) {
+      // Only set the default unit if there isn't already a valid unit for this category
+      const currentUnitIsValid =
+        unit && CATEGORY_UNITS[category]?.includes(unit);
+      if (!currentUnitIsValid) {
+        // Set default unit for the category
+        if (CATEGORY_UNITS[category]) {
+          setUnit(CATEGORY_UNITS[category][0]);
+        } else {
+          setUnit('');
+        }
+      }
+    } else {
+      // Clear unit if no category is selected
+      setUnit('');
+    }
+  }, [category, unit]);
 
   const extractExpiryDate = text => {
     // Common date formats and phrases
@@ -117,7 +177,7 @@ const ProductInputScreen = ({route, navigation}) => {
       /(\d{4}[\/-]\d{1,2}[\/-]\d{1,2})/g,
       /(\d{1,2}[\/-]\d{4})/g,
 
-      // Text month formats 
+      // Text month formats
       /(?:exp(?:iry)?|best before|use by|valid until|bb|exp\.?|use before)(?:\s*date)?[\s:\.]+(\d{1,2}\s*(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s*\d{4})/gi,
 
       // End of month formats
@@ -172,7 +232,7 @@ const ProductInputScreen = ({route, navigation}) => {
           // Check if date is valid but in the past
           if (date && !isNaN(date.getTime())) {
             if (date < new Date()) {
-              setShowExpiredDialog(true);
+              console.warn('Expiry date is in the past');
             }
             foundDates.push(date);
           }
@@ -208,223 +268,398 @@ const ProductInputScreen = ({route, navigation}) => {
     if (!category) {
       setErrors(prev => ({
         ...prev,
-        category: 'Please select a category first'
+        category: 'Please select a category first',
+      }));
+      return false;
+    }
+    if (!CATEGORY_UNITS[category]) {
+      setErrors(prev => ({
+        ...prev,
+        category: 'Selected category has no valid units',
       }));
       return false;
     }
     return true;
   };
 
+  const handleReminderSelect = value => {
+    if (value === 'custom') {
+      setIsCustomReminder(true);
+      setCustomReminderDays(reminderDays.toString());
+    } else {
+      setIsCustomReminder(false);
+      setReminderDays(value);
+    }
+    setShowReminderMenu(false);
+  };
+
+  const handleCustomReminderChange = text => {
+    const numValue = parseInt(text);
+    if (text === '' || (numValue > 0 && numValue <= 365)) {
+      setCustomReminderDays(text);
+      if (text !== '') {
+        setReminderDays(numValue);
+      }
+    }
+  };
+
+  const getReminderDisplayText = () => {
+    if (isCustomReminder) {
+      return `Custom (${reminderDays} ${reminderDays === 1 ? 'day' : 'days'})`;
+    }
+    return (
+      REMINDER_OPTIONS.find(option => option.value === reminderDays)?.label ||
+      'Select reminder'
+    );
+  };
+
   const handleSave = async () => {
-    if (!userId) {
-      setErrors({ submit: 'User not authenticated' });
+    if (!name.trim()) {
+      Alert.alert('Error', 'Please enter a product name');
       return;
     }
 
-    const productData = {
-      userId,
-      name: productName,
-      category: category === 'Other' ? customCategory : category,
-      quantity,
-      unit,
-      // Convert date to Firestore timestamp
-      expiryDate: firestore.Timestamp.fromDate(expiryDate),
-      notes,
-      isExpired: false,
-    };
+    if (!category) {
+      Alert.alert('Error', 'Please select a category');
+      return;
+    }
 
-    const { isValid, errors: validationErrors } = validateProduct(productData);
+    if (!unit) {
+      Alert.alert('Error', 'Please select a unit');
+      return;
+    }
 
-    if (!isValid) {
-      setErrors(validationErrors);
+    if (category === 'Other' && !customCategory.trim()) {
+      Alert.alert('Error', 'Please enter a custom category');
       return;
     }
 
     try {
-      setSaving(true);
-      await addProduct(productData);
-      navigation.navigate('Home');
+      setLoading(true);
+      const productData = {
+        name: name.trim(),
+        barcode: barcode || '',
+        category: category === 'Other' ? 'Other' : category,
+        customCategory: category === 'Other' ? customCategory.trim() : '',
+        quantity: parseInt(quantity) || 1,
+        unit: unit,
+        expiryDate: firestore.Timestamp.fromDate(expiryDate || new Date()),
+        notes: notes || '',
+        reminderDays: reminderDays,
+        updatedAt: firestore.Timestamp.now(),
+        isCustomCategory: category === 'Other',
+      };
+
+      if (isEditing) {
+        await firestore()
+          .collection('products')
+          .doc(product.id)
+          .update(productData);
+      } else {
+        const currentUser = auth().currentUser;
+        if (!currentUser) {
+          throw new Error('User not authenticated');
+        }
+
+        await firestore()
+          .collection('products')
+          .add({
+            ...productData,
+            userId: currentUser.uid,
+            createdAt: firestore.Timestamp.now(),
+          });
+      }
+
+      navigation.navigate('HomeScreen');
     } catch (error) {
-      setErrors({ submit: error.message });
+      console.error('Error saving product:', error);
+      Alert.alert('Error', 'Failed to save product. Please try again.');
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
 
-  const handleQuantityChange = (value) => {
-    const newQuantity = parseInt(value);
-    if (!isNaN(newQuantity) && newQuantity > 0) {
-      setQuantity(newQuantity);
+  const handleQuantityChange = value => {
+    // Allow empty value while typing
+    if (value === '') {
+      setQuantity('');
+      return;
+    }
+
+    const numValue = parseInt(value);
+    // Only update if it's a valid number
+    if (!isNaN(numValue)) {
+      setQuantity(value);
+    }
+  };
+
+  const handleQuantityBlur = () => {
+    // When focus is lost, ensure quantity is valid
+    const numValue = parseInt(quantity);
+    if (quantity === '' || isNaN(numValue) || numValue <= 0) {
+      setQuantity('1');
+    }
+  };
+
+  const incrementQuantity = () => {
+    const newQuantity = parseInt(quantity) || 0;
+    setQuantity((newQuantity + 1).toString());
+  };
+
+  const decrementQuantity = () => {
+    const newQuantity = parseInt(quantity) || 0;
+    if (newQuantity > 1) {
+      setQuantity((newQuantity - 1).toString());
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
+      <Appbar.Header style={{backgroundColor: colors.background}}>
+        <Appbar.BackAction onPress={() => navigation.goBack()} />
+        <Appbar.Content
+          title={isEditing ? 'Edit Product' : 'Add Product'}
+          color={colors.text}
+        />
+      </Appbar.Header>
+
       {loading ? (
         <View style={styles.loading}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Scanning expiry date...</Text>
+          <Text style={styles.loadingText}>
+            {isScanning ? 'Scanning expiry date...' : 'Saving product...'}
+          </Text>
         </View>
       ) : (
-        <ScrollView>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={{paddingBottom: tabBarHeight + 20}}>
           <Surface style={styles.form}>
-            <Text variant="titleMedium" style={styles.title}>
-              Add Product Details
-            </Text>
+            <View style={styles.section}>
+              <Text variant="titleMedium" style={styles.sectionTitle}>
+                Basic Information
+              </Text>
 
-            <Menu
-              visible={menuVisible}
-              onDismiss={() => setMenuVisible(false)}
-              anchor={
-                <Button
-                  mode="outlined"
-                  onPress={() => setMenuVisible(true)}
-                  style={[
-                    styles.input,
-                    errors.category && styles.inputError
-                  ]}>
-                  {category || 'Select Category'}
-                </Button>
-              }>
-              {CATEGORIES.map(cat => (
-                <Menu.Item
-                  key={cat}
-                  onPress={() => {
-                    if (cat === 'Other') {
-                      setCustomCategory('');
-                    }
-                    setCategory(cat);
-                    setMenuVisible(false);
-                    // Clear the category error when a category is selected
-                    setErrors(prev => ({ ...prev, category: undefined }));
-                  }}
-                  title={cat}
-                />
-              ))}
-            </Menu>
-            <ErrorMessage message={errors.category} />
-
-            {category === 'Other' && (
               <TextInput
-                label="Custom Category"
-                value={customCategory}
-                onChangeText={setCustomCategory}
+                label="Product Name"
+                value={name}
+                onChangeText={text => {
+                  setName(text);
+                  setErrors(prev => ({...prev, name: undefined}));
+                }}
+                style={[styles.input, errors.name && styles.inputError]}
+              />
+              <ErrorMessage message={errors.name} />
+
+              <Menu
+                visible={menuVisible}
+                onDismiss={() => setMenuVisible(false)}
+                anchor={
+                  <Button
+                    mode="outlined"
+                    onPress={() => setMenuVisible(true)}
+                    style={[
+                      styles.input,
+                      errors.category && styles.inputError,
+                    ]}>
+                    {category || 'Select Category'}
+                  </Button>
+                }>
+                {CATEGORIES.map(cat => (
+                  <Menu.Item
+                    key={cat}
+                    onPress={() => {
+                      if (cat === 'Other') {
+                        setCustomCategory('');
+                      }
+                      setCategory(cat);
+                      setMenuVisible(false);
+                      setErrors(prev => ({...prev, category: undefined}));
+                    }}
+                    title={cat}
+                  />
+                ))}
+              </Menu>
+              <ErrorMessage message={errors.category} />
+
+              {category === 'Other' && (
+                <TextInput
+                  label="Custom Category"
+                  value={customCategory}
+                  onChangeText={setCustomCategory}
+                  style={styles.input}
+                />
+              )}
+
+              <TextInput
+                label="Barcode (Optional)"
+                value={barcode}
+                onChangeText={setBarcode}
                 style={styles.input}
               />
-            )}
+            </View>
 
-            <TextInput
-              label="Product Name"
-              value={productName}
-              onChangeText={(text) => {
-                setProductName(text);
-                setErrors(prev => ({ ...prev, name: undefined }));
-              }}
-              style={[
-                styles.input,
-                errors.name && styles.inputError
-              ]}
-            />
-            <ErrorMessage message={errors.name} />
+            <View style={styles.section}>
+              <Text variant="titleMedium" style={styles.sectionTitle}>
+                Quantity & Unit
+              </Text>
 
-            <View style={styles.quantityRow}>
-              <View style={styles.quantityContainer}>
-                <Text style={styles.label}>Quantity</Text>
-                <View style={styles.quantityInput}>
-                  <IconButton
-                    icon="minus"
-                    size={20}
-                    onPress={() => quantity > 1 && setQuantity(quantity - 1)}
-                  />
-                  <TextInput
-                    value={quantity.toString()}
-                    onChangeText={handleQuantityChange}
-                    keyboardType="numeric"
-                    style={styles.quantityTextInput}
-                  />
-                  <IconButton
-                    icon="plus"
-                    size={20}
-                    onPress={() => setQuantity(quantity + 1)}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.unitContainer}>
-                <Text style={styles.label}>Unit</Text>
-                <Menu
-                  visible={unitMenuVisible}
-                  onDismiss={() => setUnitMenuVisible(false)}
-                  anchor={
-                    <Button
-                      mode="outlined"
-                      onPress={() => {
-                        if (validateAndShowUnitError()) {
-                          setUnitMenuVisible(true);
-                        }
-                      }}
-                      style={styles.unitButton}>
-                      {unit || 'Select Unit'}
-                    </Button>
-                  }>
-                  {category && CATEGORY_UNITS[category]?.map(unitOption => (
-                    <Menu.Item
-                      key={unitOption}
-                      onPress={() => {
-                        setUnit(unitOption);
-                        setUnitMenuVisible(false);
-                      }}
-                      title={unitOption}
+              <View style={styles.quantityRow}>
+                <View style={styles.quantityContainer}>
+                  <Text style={styles.label}>Quantity</Text>
+                  <View style={styles.quantityInput}>
+                    <IconButton
+                      icon="minus"
+                      size={20}
+                      onPress={decrementQuantity}
+                      disabled={!quantity || parseInt(quantity) <= 1}
                     />
-                  ))}
-                </Menu>
+                    <TextInput
+                      value={quantity}
+                      onChangeText={handleQuantityChange}
+                      onBlur={handleQuantityBlur}
+                      keyboardType="numeric"
+                      style={styles.quantityTextInput}
+                      selectTextOnFocus={true}
+                    />
+                    <IconButton
+                      icon="plus"
+                      size={20}
+                      onPress={incrementQuantity}
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.unitContainer}>
+                  <Text style={styles.label}>Unit</Text>
+                  <Menu
+                    visible={unitMenuVisible}
+                    onDismiss={() => setUnitMenuVisible(false)}
+                    anchor={
+                      <Button
+                        mode="outlined"
+                        onPress={() => {
+                          if (validateAndShowUnitError()) {
+                            setUnitMenuVisible(true);
+                          }
+                        }}
+                        style={styles.unitButton}>
+                        {unit || 'Select Unit'}
+                      </Button>
+                    }>
+                    {category &&
+                      CATEGORY_UNITS[category]?.map(unitOption => (
+                        <Menu.Item
+                          key={unitOption}
+                          onPress={() => {
+                            setUnit(unitOption);
+                            setUnitMenuVisible(false);
+                          }}
+                          title={unitOption}
+                        />
+                      ))}
+                  </Menu>
+                </View>
               </View>
             </View>
 
-            <Button
-              mode="outlined"
-              onPress={() => setShowDatePicker(true)}
-              style={styles.input}>
-              Expiry Date: {formatDateForDisplay(expiryDate)}
-            </Button>
+            <View style={styles.section}>
+              <Text variant="titleMedium" style={styles.sectionTitle}>
+                Expiry Details
+              </Text>
 
-            <TextInput
-              label="Additional Notes"
-              value={notes}
-              onChangeText={setNotes}
-              multiline
-              numberOfLines={3}
-              style={[styles.input, {height:80}]}
-            />
+              <Button
+                mode="outlined"
+                onPress={() => setShowDatePicker(true)}
+                style={styles.input}
+                icon="calendar">
+                Expiry Date: {formatDateForDisplay(expiryDate)}
+              </Button>
 
-            <DatePicker
-              modal
-              open={showDatePicker}
-              date={expiryDate}
-              mode="date"
-              minimumDate={new Date()}
-              onConfirm={date => {
-                setShowDatePicker(false);
-                setExpiryDate(date);
-              }}
-              onCancel={() => {
-                setShowDatePicker(false);
-              }}
-            />
+              <View style={styles.reminderContainer}>
+                <Text style={styles.label}>Remind me before expiry in:</Text>
+                <Menu
+                  visible={showReminderMenu}
+                  onDismiss={() => setShowReminderMenu(false)}
+                  anchor={
+                    <Button
+                      mode="outlined"
+                      onPress={() => setShowReminderMenu(true)}
+                      style={styles.input}
+                      icon="bell-outline">
+                      {getReminderDisplayText()}
+                    </Button>
+                  }>
+                  {REMINDER_OPTIONS.map(option => (
+                    <Menu.Item
+                      key={option.value}
+                      onPress={() => handleReminderSelect(option.value)}
+                      title={option.label}
+                    />
+                  ))}
+                </Menu>
+
+                {isCustomReminder && (
+                  <View style={styles.customReminderContainer}>
+                    <TextInput
+                      label="Days"
+                      value={customReminderDays}
+                      onChangeText={handleCustomReminderChange}
+                      keyboardType="numeric"
+                      style={styles.customReminderInput}
+                      maxLength={3}
+                    />
+                    <Text style={styles.customReminderLabel}>
+                      {customReminderDays === '1' ? 'Day' : 'Days'}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.section}>
+              <Text variant="titleMedium" style={styles.sectionTitle}>
+                Additional Information
+              </Text>
+
+              <TextInput
+                label="Notes (Optional)"
+                value={notes}
+                onChangeText={setNotes}
+                multiline
+                numberOfLines={3}
+                style={[styles.input, styles.notesInput]}
+              />
+            </View>
 
             <Button
               mode="contained"
               onPress={handleSave}
+              loading={loading}
               style={styles.saveButton}
-              loading={saving}
-              disabled={saving}>
-              Save Product
+              disabled={loading}>
+              {isEditing ? 'Update Product' : 'Save Product'}
             </Button>
 
             {errors.submit && <ErrorMessage message={errors.submit} />}
           </Surface>
         </ScrollView>
       )}
+
+      <DatePicker
+        modal
+        open={showDatePicker}
+        date={expiryDate}
+        mode="date"
+        minimumDate={new Date()}
+        onConfirm={date => {
+          setShowDatePicker(false);
+          setExpiryDate(date);
+        }}
+        onCancel={() => {
+          setShowDatePicker(false);
+        }}
+      />
 
       <Portal>
         <Dialog
@@ -465,20 +700,34 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  scrollView: {
+    flex: 1,
+  },
   form: {
     margin: 16,
     padding: 16,
-    borderRadius: 8,
+    borderRadius: 12,
+    elevation: 2,
   },
-  title: {
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
     marginBottom: 16,
-    textAlign: 'center',
+    color: colors.primary,
+    fontWeight: '600',
   },
   input: {
-    marginBottom: 16,
+    marginBottom: 12,
+    backgroundColor: 'transparent',
+  },
+  notesInput: {
+    height: 100,
+    textAlignVertical: 'top',
   },
   saveButton: {
     marginTop: 8,
+    paddingVertical: 6,
   },
   loading: {
     flex: 1,
@@ -496,7 +745,7 @@ const styles = StyleSheet.create({
   quantityRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   quantityContainer: {
     flex: 1,
@@ -509,15 +758,15 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 12,
     color: colors.text,
-    marginBottom: 4,
+    marginBottom: 8,
   },
   quantityInput: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.disabled,
-    borderRadius: 4,
-    paddingBottom: 4,
+    borderRadius: 8,
+    paddingVertical: 4,
   },
   quantityTextInput: {
     flex: 1,
@@ -525,15 +774,32 @@ const styles = StyleSheet.create({
     height: 40,
     padding: 0,
     backgroundColor: 'transparent',
-    marginBottom: -4,
   },
   unitButton: {
-    height: 40,
+    height: 48,
     justifyContent: 'center',
   },
   inputError: {
     borderColor: colors.error,
     borderWidth: 1,
+  },
+  reminderContainer: {
+    marginTop: 8,
+  },
+  customReminderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  customReminderInput: {
+    flex: 1,
+    marginRight: 8,
+    backgroundColor: 'transparent',
+  },
+  customReminderLabel: {
+    fontSize: 16,
+    color: colors.text,
+    marginLeft: 8,
   },
 });
 

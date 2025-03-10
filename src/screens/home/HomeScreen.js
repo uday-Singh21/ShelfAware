@@ -1,30 +1,36 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Alert, PermissionsAndroid, Platform, RefreshControl, ScrollView, ActivityIndicator } from 'react-native';
-import { Appbar, Text, Searchbar, SegmentedButtons } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, {useState, useEffect} from 'react';
+import {
+  View,
+  StyleSheet,
+  RefreshControl,
+  ActivityIndicator,
+  Alert,
+  Keyboard,
+  ScrollView,
+} from 'react-native';
+import {Appbar, Text, Searchbar, Menu, Divider} from 'react-native-paper';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { colors } from '../../constants/colors';
-import ScanButton from '../../components/common/ScanButton';
+import {colors} from '../../constants/colors';
 import ProductCard from '../../components/common/ProductCard';
-import { launchCamera } from 'react-native-image-picker';
-import { useNavigation } from '@react-navigation/native';
+import {useNavigation} from '@react-navigation/native';
+import {useBottomTabBarHeight} from '@react-navigation/bottom-tabs';
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
-
-const SORT_OPTIONS = [
-  { label: 'Recent', value: 'recent' },
-  { label: 'Expiring', value: 'expiring' },
-];
+import {fonts} from '../../constants/fonts';
 
 const HomeScreen = () => {
   const navigation = useNavigation();
+  const tabBarHeight = useBottomTabBarHeight();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState('recent');
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [menuAnchor, setMenuAnchor] = useState({x: 0, y: 0});
 
-  const fetchProducts = async () => {
+  const fetchProducts = React.useCallback(async () => {
     const userId = auth().currentUser?.uid;
     if (!userId) {
       setLoading(false);
@@ -35,13 +41,8 @@ const HomeScreen = () => {
     try {
       let query = firestore()
         .collection('products')
-        .where('userId', '==', userId);
-
-      if (sortBy === 'expiring') {
-        query = query.orderBy('expiryDate', 'asc');
-      } else {
-        query = query.orderBy('createdAt', 'desc');
-      }
+        .where('userId', '==', userId)
+        .orderBy('createdAt', 'desc');
 
       const snapshot = await query.get();
       const fetchedProducts = snapshot.docs.map(doc => {
@@ -49,9 +50,7 @@ const HomeScreen = () => {
         return {
           id: doc.id,
           ...data,
-          // Convert Firestore Timestamp to milliseconds for the ProductCard
           expiryDate: data.expiryDate?.toMillis() || 0,
-          // Ensure all required fields have default values
           name: data.name || '',
           category: data.category || '',
           quantity: data.quantity || 0,
@@ -64,7 +63,6 @@ const HomeScreen = () => {
       setProducts(fetchedProducts);
     } catch (error) {
       console.error('Error fetching products:', error);
-      // Only show alert if there's an actual error, not just empty data
       if (error.code !== 'permission-denied') {
         Alert.alert('Error', 'Failed to load products. Please try again.');
       }
@@ -72,153 +70,178 @@ const HomeScreen = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchProducts();
-  }, [sortBy]);
+  }, [fetchProducts]);
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
     fetchProducts();
-  }, []);
+  }, [fetchProducts]);
 
-  const handleProductPress = (product) => {
-    // TODO: Navigate to product details
+  const handleProductPress = product => {
     console.log('Product pressed:', product);
   };
 
-  const requestCameraPermission = async () => {
-    if (Platform.OS === 'android') {
-      try {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.CAMERA,
-          {
-            title: "Camera Permission",
-            message: "App needs camera permission to scan products",
-            buttonPositive: "OK",
-            buttonNegative: "Cancel",
-          }
-        );
-        return granted === PermissionsAndroid.RESULTS.GRANTED;
-      } catch (err) {
-        console.warn(err);
-        return false;
-      }
-    }
-    return true;
-  };
-
-  const handleScan = async () => {
-    const userId = auth().currentUser?.uid;
-    if (!userId) {
-      Alert.alert('Error', 'Please sign in to scan products');
-      return;
-    }
-
-    const hasPermission = await requestCameraPermission();
-    
-    if (!hasPermission) {
-      Alert.alert('Permission Required', 'Camera permission is needed to scan products');
-      return;
-    }
-
-    const options = {
-      mediaType: 'photo',
-      quality: 1,
-      saveToPhotos: false,
-      includeBase64: false,
-      cameraType: 'back',
-      presentationStyle: 'fullScreen',
-    };
-
+  const handleDeleteProduct = async product => {
     try {
-      const result = await launchCamera(options);
-      
-      if (result.didCancel) return;
-      
-      if (result.errorCode) {
-        Alert.alert('Error', result.errorMessage);
-        return;
-      }
-      
-      if (result.assets && result.assets[0]?.uri) {
-        navigation.navigate('ProductInput', { 
-          photoPath: result.assets[0].uri,
-          userId: userId // Pass userId to ProductInput
-        });
-      }
+      await firestore().collection('products').doc(product.id).delete();
+
+      // Refresh products list
+      fetchProducts();
+      Alert.alert('Success', 'Product deleted successfully');
     } catch (error) {
-      console.error('Failed to take photo:', error);
-      Alert.alert('Error', 'Failed to capture image');
+      console.error('Error deleting product:', error);
+      Alert.alert('Error', 'Failed to delete product. Please try again.');
     }
   };
 
-  const filteredProducts = products.filter(product => 
-    product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    product.barcode.includes(searchQuery)
-  );
+  const showDeleteConfirmation = product => {
+    Alert.alert(
+      'Delete Product',
+      'Are you sure you want to delete this product?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          onPress: () => handleDeleteProduct(product),
+          style: 'destructive',
+        },
+      ],
+      {cancelable: true},
+    );
+  };
+
+  const handleEditProduct = product => {
+    navigation.navigate('ProductInput', {
+      product: product,
+      isEditing: true,
+    });
+  };
+
+  const handleMenuOpen = (product, event) => {
+    const {pageX, pageY} = event.nativeEvent;
+    setMenuAnchor({x: pageX, y: pageY});
+    setSelectedProduct(product);
+    setMenuVisible(true);
+  };
+
+  const handleMenuClose = () => {
+    setMenuVisible(false);
+    setSelectedProduct(null);
+  };
+
+  const filteredProducts = products.filter(product => {
+    const query = searchQuery.toLowerCase().trim();
+    return (
+      product.name.toLowerCase().includes(query) ||
+      product.barcode?.includes(query) ||
+      product.category?.toLowerCase().includes(query) ||
+      product.notes?.toLowerCase().includes(query)
+    );
+  });
 
   return (
     <SafeAreaView style={styles.container}>
-      <Appbar.Header>
-        <Appbar.Content title="Shelf Aware" />
+      <Appbar.Header style={styles.header}>
+        <Appbar.Content title="ShelfAware" color={colors.text} />
       </Appbar.Header>
 
-      <View style={styles.searchContainer}>
-        <Searchbar
-          placeholder="Search products..."
-          onChangeText={setSearchQuery}
-          value={searchQuery}
-          style={styles.searchBar}
-        />
-      </View>
-
-      <View style={styles.sortContainer}>
-        <SegmentedButtons
-          value={sortBy}
-          onValueChange={setSortBy}
-          buttons={SORT_OPTIONS}
-        />
-      </View>
-
       <View style={styles.content}>
-        <View style={styles.header}>
-          <Icon name="barcode-scan" size={40} color={colors.primary} />
-          <Text style={styles.sectionTitle}>Recently Scanned</Text>
-        </View>
-
         {loading ? (
           <View style={styles.emptyState}>
             <ActivityIndicator size="large" color={colors.primary} />
           </View>
-        ) : filteredProducts.length > 0 ? (
+        ) : (
           <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={[
+              styles.scrollContent,
+              {paddingBottom: tabBarHeight},
+            ]}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
-          >
-            {filteredProducts.map(product => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                onPress={() => handleProductPress(product)}
+            }>
+            {/* Search Section */}
+            <View style={styles.searchContainer}>
+              <Searchbar
+                placeholder="Search products..."
+                placeholderTextColor={colors.disabled}
+                onChangeText={setSearchQuery}
+                value={searchQuery}
+                style={styles.searchBar}
+                iconColor={colors.text}
+                clearButtonMode="while-editing"
+                autoCapitalize="none"
+                returnKeyType="search"
+                onSubmitEditing={Keyboard.dismiss}
               />
-            ))}
-          </ScrollView>
-        ) : (
-          <View style={styles.emptyState}>
-            <Icon name="package-variant" size={64} color={colors.disabled} />
-            <Text style={styles.emptyText}>
-              {searchQuery
-                ? 'No products found'
-                : 'No products scanned yet'}
-            </Text>
-          </View>
-        )}
-      </View>
+            </View>
 
-      <ScanButton onPress={handleScan} />
+            {/* Header Section */}
+            <View style={styles.sectionHeader}>
+              <Icon name="barcode-scan" size={40} color={colors.primary} />
+              <Text style={styles.sectionTitle}>
+                {searchQuery ? 'Search Results' : 'Recently Scanned'}
+              </Text>
+            </View>
+
+            {/* Products List Section */}
+            {filteredProducts.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Icon
+                  name="package-variant"
+                  size={64}
+                  color={colors.disabled}
+                />
+                <Text style={styles.emptyText}>
+                  {searchQuery ? 'No products found' : 'No products added yet'}
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.productsContainer}>
+                {filteredProducts.map(item => (
+                  <ProductCard
+                    key={item.id}
+                    product={item}
+                    onPress={() => handleProductPress(item)}
+                    onMorePress={event => handleMenuOpen(item, event)}
+                  />
+                ))}
+              </View>
+            )}
+          </ScrollView>
+        )}
+
+        <Menu
+          visible={menuVisible}
+          onDismiss={handleMenuClose}
+          anchor={menuAnchor}>
+          <Menu.Item
+            onPress={() => {
+              handleMenuClose();
+              handleEditProduct(selectedProduct);
+            }}
+            title="Edit"
+            leadingIcon="pencil"
+          />
+          <Divider />
+          <Menu.Item
+            onPress={() => {
+              handleMenuClose();
+              showDeleteConfirmation(selectedProduct);
+            }}
+            title="Delete"
+            leadingIcon="delete"
+            titleStyle={{color: colors.error}}
+          />
+        </Menu>
+      </View>
     </SafeAreaView>
   );
 };
@@ -226,26 +249,33 @@ const HomeScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.background,
+  },
+  header: {
+    backgroundColor: colors.background,
+    elevation: 0,
+  },
+  content: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
   },
   searchContainer: {
     paddingHorizontal: 16,
     paddingVertical: 8,
+    backgroundColor: colors.background,
   },
   searchBar: {
-    elevation: 0,
-    borderWidth: 1,
-    borderColor: colors.disabled,
+    marginBottom: 16,
+    backgroundColor: colors.card,
+    elevation: 2,
+    borderRadius: 12,
   },
-  sortContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-  },
-  content: {
-    flex: 1,
-    paddingTop: 16,
-  },
-  header: {
+  sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
@@ -253,19 +283,24 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
     marginLeft: 12,
   },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    minHeight: 200,
   },
   emptyText: {
     marginTop: 16,
     color: colors.disabled,
     fontSize: 16,
+    fontFamily: fonts.regular,
+  },
+  productsContainer: {
+    paddingHorizontal: 16,
   },
 });
 
-export default HomeScreen; 
+export default HomeScreen;

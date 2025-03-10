@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet } from 'react-native';
 import { Text } from 'react-native-paper';
 import { colors } from '../../constants/colors';
+import { fonts } from '../../constants/fonts';
 
 const ErrorMessage = ({ message }) => {
   if (!message) return null;
@@ -17,6 +18,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
     marginBottom: 8,
+    fontFamily: fonts.medium,
   },
 });
 

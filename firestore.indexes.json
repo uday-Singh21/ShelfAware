@@ -1,0 +1,1 @@
+{"indexes":[{"collectionGroup":"products","queryScope":"COLLECTION","fields":[{"fieldPath":"userId","order":"ASCENDING"},{"fieldPath":"expiryDate","order":"ASCENDING"}]}]}

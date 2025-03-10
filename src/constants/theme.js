@@ -1,24 +1,135 @@
+import { MD3LightTheme } from 'react-native-paper';
 import { colors } from './colors';
-import { MD3LightTheme, configureFonts } from 'react-native-paper';
-
-const fontConfig = {
-  customVariant: {
-    fontFamily: 'System',
-    fontWeight: '400',
-  },
-};
+import { Platform } from 'react-native';
+import { fonts, fontConfig } from './fonts';
 
 export const theme = {
   ...MD3LightTheme,
+  fonts: {
+    displayLarge: {
+      fontFamily: fonts.regular,
+      fontSize: 57,
+      letterSpacing: 0,
+      lineHeight: 64,
+      fontWeight: Platform.select({ ios: '400', android: 'normal' }),
+    },
+    displayMedium: {
+      fontFamily: fonts.regular,
+      fontSize: 45,
+      letterSpacing: 0,
+      lineHeight: 52,
+      fontWeight: Platform.select({ ios: '400', android: 'normal' }),
+    },
+    displaySmall: {
+      fontFamily: fonts.regular,
+      fontSize: 36,
+      letterSpacing: 0,
+      lineHeight: 44,
+      fontWeight: Platform.select({ ios: '400', android: 'normal' }),
+    },
+    headlineLarge: {
+      fontFamily: fonts.regular,
+      fontSize: 32,
+      letterSpacing: 0,
+      lineHeight: 40,
+      fontWeight: Platform.select({ ios: '400', android: 'normal' }),
+    },
+    headlineMedium: {
+      fontFamily: fonts.regular,
+      fontSize: 28,
+      letterSpacing: 0,
+      lineHeight: 36,
+      fontWeight: Platform.select({ ios: '400', android: 'normal' }),
+    },
+    headlineSmall: {
+      fontFamily: fonts.regular,
+      fontSize: 24,
+      letterSpacing: 0,
+      lineHeight: 32,
+      fontWeight: Platform.select({ ios: '400', android: 'normal' }),
+    },
+    titleLarge: {
+      fontFamily: fonts.medium,
+      fontSize: 22,
+      letterSpacing: 0,
+      lineHeight: 28,
+      fontWeight: Platform.select({ ios: '500', android: 'normal' }),
+    },
+    titleMedium: {
+      fontFamily: fonts.medium,
+      fontSize: 16,
+      letterSpacing: 0.15,
+      lineHeight: 24,
+      fontWeight: Platform.select({ ios: '500', android: 'normal' }),
+    },
+    titleSmall: {
+      fontFamily: fonts.medium,
+      fontSize: 14,
+      letterSpacing: 0.1,
+      lineHeight: 20,
+      fontWeight: Platform.select({ ios: '500', android: 'normal' }),
+    },
+    labelLarge: {
+      fontFamily: fonts.medium,
+      fontSize: 14,
+      letterSpacing: 0.1,
+      lineHeight: 20,
+      fontWeight: Platform.select({ ios: '500', android: 'normal' }),
+    },
+    labelMedium: {
+      fontFamily: fonts.medium,
+      fontSize: 12,
+      letterSpacing: 0.5,
+      lineHeight: 16,
+      fontWeight: Platform.select({ ios: '500', android: 'normal' }),
+    },
+    labelSmall: {
+      fontFamily: fonts.medium,
+      fontSize: 11,
+      letterSpacing: 0.5,
+      lineHeight: 16,
+      fontWeight: Platform.select({ ios: '500', android: 'normal' }),
+    },
+    bodyLarge: {
+      fontFamily: fonts.regular,
+      fontSize: 16,
+      letterSpacing: 0.15,
+      lineHeight: 24,
+      fontWeight: Platform.select({ ios: '400', android: 'normal' }),
+    },
+    bodyMedium: {
+      fontFamily: fonts.regular,
+      fontSize: 14,
+      letterSpacing: 0.25,
+      lineHeight: 20,
+      fontWeight: Platform.select({ ios: '400', android: 'normal' }),
+    },
+    bodySmall: {
+      fontFamily: fonts.regular,
+      fontSize: 12,
+      letterSpacing: 0.4,
+      lineHeight: 16,
+      fontWeight: Platform.select({ ios: '400', android: 'normal' }),
+    },
+  },
   colors: {
     ...MD3LightTheme.colors,
-    ...colors,
-  },
-  fonts: configureFonts({
-    config: {
-      ...fontConfig,
+    primary: colors.primary,
+    secondary: colors.secondary,
+    background: colors.background,
+    surface: colors.surface,
+    error: colors.error,
+    text: colors.text,
+    disabled: colors.disabled,
+    placeholder: colors.disabled,
+    backdrop: 'rgba(0, 0, 0, 0.5)',
+    elevation: {
+      level0: colors.surface,
+      level1: colors.surface,
+      level2: colors.surface,
+      level3: colors.surface,
+      level4: colors.surface,
+      level5: colors.surface,
     },
-  }),
-  roundness: 4,
-  isV3: true, // This is important for MD3 theme
+  },
 };
